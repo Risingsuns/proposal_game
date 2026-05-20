@@ -743,7 +743,7 @@
 
                 // 操作提示
                 this.hintText = this.add.text(GAME_WIDTH - 30, GAME_HEIGHT - 30,
-                    '←→ / 手柄摇杆移动', {
+                    '← 点击左侧后退 | 点击右侧前进 →', {
                     fontSize: '18px',
                     fontFamily: '"Huninn", "STKaiti", sans-serif',
                     color: '#FFFFFF',
@@ -751,6 +751,23 @@
                     strokeThickness: 3,
                     align: 'right'
                 }).setOrigin(1, 1).setDepth(40);
+
+                // 触屏控制：左右半屏点击
+                this.touchLeft = this.add.rectangle(0, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x000000, 0)
+                    .setOrigin(0, 0).setDepth(60).setInteractive();
+                this.touchLeft.on('pointerdown', () => {
+                    if (!this.isMoving && !this.proposalUIVisible && !this.hasProposed && this.currentLandmarkIndex > 0) {
+                        this.moveToLandmark(this.currentLandmarkIndex - 1);
+                    }
+                });
+
+                this.touchRight = this.add.rectangle(GAME_WIDTH / 2, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x000000, 0)
+                    .setOrigin(0, 0).setDepth(60).setInteractive();
+                this.touchRight.on('pointerdown', () => {
+                    if (!this.isMoving && !this.proposalUIVisible && !this.hasProposed && this.currentLandmarkIndex < LANDMARKS.length - 1) {
+                        this.moveToLandmark(this.currentLandmarkIndex + 1);
+                    }
+                });
 
                 // 初始化求婚UI（隐藏）
                 this.createProposalUI();
