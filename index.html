@@ -362,9 +362,13 @@
                     repeat: -1
                 });
 
-                // 等待输入
+                // 等待输入（排除F键等功能键）
                 this.time.delayedCall(500, () => { this.canOpen = true; });
-                this.input.keyboard.once('keydown', () => this.openCurtains());
+                this.input.keyboard.once('keydown', (event) => {
+                    if (event.key && !event.key.startsWith('F')) {
+                        this.openCurtains();
+                    }
+                });
                 this.input.once('pointerdown', () => this.openCurtains());
             }
 
