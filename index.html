@@ -1,0 +1,1808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Marry Me - 求婚小程序</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Huninn', 'STKaiti', 'Microsoft YaHei', serif;
+        }
+
+        #game-container {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container"></div>
+
+    <!-- 引入 Phaser 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.86.0/dist/phaser.js"></script>
+
+    <script>
+        // ==================== 全局配置 ====================
+        const GAME_WIDTH = 1920;
+        const GAME_HEIGHT = 1080;
+
+        // 里程碑路径点（从左下到右上）
+        const LANDMARKS = [
+            { x: 700, y: 950, photoColor: '#FF6B6B', name: '✨ 初遇·缘分的开始' },
+            { x: 550, y: 850, photoColor: '#FFB347', name: '🚣 2025.4.20 第一次约会·北海泛舟' },
+            { x: 600, y: 750, photoColor: '#4ECDC4', name: '🌸 2025.5.20 第一次牵手·清华园漫步' },
+            { x: 750, y: 670, photoColor: '#FFE66D', name: '💌 2025.6.16 表白·五道口的约定' },
+            { x: 930, y: 620, photoColor: '#FFD700', name: '🎤 2025.8.8 第一次看演唱会·鸟巢星空' },
+            { x: 1100, y: 570, photoColor: '#A8E6CF', name: '⛷️ 2025.12.21 滑雪·雪中同行' },
+            { x: 1100, y: 470, photoColor: '#A8E6CF', name: '🧩 乐高·我们努力的成果' },
+            { x: 1200, y: 320, photoColor: '#FF8B94', name: '💖 现在·与你共度的每一天' },
+            { x: 1200, y: 320, photoColor: '#C7CEEA', name: '终点' }
+        ];
+
+        // 背景类型
+        const BGTYPE = {
+            DAY: 'day',
+            DUSK: 'dusk',
+            NIGHT: 'night'
+        };
+
+        // ==================== 辅助函数：生成占位图 ====================
+        function createPlaceholderTexture(scene, key, width, height, type, options = {}) {
+            if (scene.textures.exists(key)) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            switch (type) {
+                case 'bg_day':
+                    // 白天：蓝天、绿草地、小路、城堡
+                    ctx.fillStyle = '#87CEEB';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.fillStyle = '#5DAA5D';
+                    ctx.fillRect(0, height * 0.7, width, height * 0.3);
+                    // 小路
+                    ctx.fillStyle = '#C4A265';
+                    ctx.beginPath();
+                    ctx.moveTo(0, height);
+                    ctx.lineTo(width * 0.7, height * 0.5);
+                    ctx.lineTo(width, height * 0.5);
+                    ctx.lineTo(width, height);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 城堡
+                    ctx.fillStyle = '#A0A0A0';
+                    ctx.fillRect(width * 0.75, height * 0.3, 200, 200);
+                    ctx.fillStyle = '#808080';
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.75, height * 0.3);
+                    ctx.lineTo(width * 0.85, height * 0.1);
+                    ctx.lineTo(width * 0.95, height * 0.3);
+                    ctx.fill();
+                    break;
+
+                case 'bg_dusk':
+                    // 黄昏
+                    ctx.fillStyle = '#FF7E5F';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.fillStyle = '#FEB47B';
+                    ctx.fillRect(0, height * 0.3, width, height * 0.7);
+                    ctx.fillStyle = '#5D8A5D';
+                    ctx.fillRect(0, height * 0.7, width, height * 0.3);
+                    ctx.fillStyle = '#A08050';
+                    ctx.beginPath();
+                    ctx.moveTo(0, height);
+                    ctx.lineTo(width * 0.7, height * 0.5);
+                    ctx.lineTo(width, height * 0.5);
+                    ctx.lineTo(width, height);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#909090';
+                    ctx.fillRect(width * 0.75, height * 0.3, 200, 200);
+                    ctx.fillStyle = '#707070';
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.75, height * 0.3);
+                    ctx.lineTo(width * 0.85, height * 0.1);
+                    ctx.lineTo(width * 0.95, height * 0.3);
+                    ctx.fill();
+                    // 太阳
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(width * 0.2, height * 0.25, 80, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+
+                case 'bg_night':
+                    // 夜晚
+                    ctx.fillStyle = '#0a0a2a';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.fillStyle = '#1a1a4a';
+                    ctx.fillRect(0, height * 0.3, width, height * 0.7);
+                    ctx.fillStyle = '#2a5a2a';
+                    ctx.fillRect(0, height * 0.7, width, height * 0.3);
+                    ctx.fillStyle = '#6a5a3a';
+                    ctx.beginPath();
+                    ctx.moveTo(0, height);
+                    ctx.lineTo(width * 0.7, height * 0.5);
+                    ctx.lineTo(width, height * 0.5);
+                    ctx.lineTo(width, height);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#606060';
+                    ctx.fillRect(width * 0.75, height * 0.3, 200, 200);
+                    ctx.fillStyle = '#404040';
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.75, height * 0.3);
+                    ctx.lineTo(width * 0.85, height * 0.1);
+                    ctx.lineTo(width * 0.95, height * 0.3);
+                    ctx.fill();
+                    // 月亮和星星
+                    ctx.fillStyle = '#FFFACD';
+                    ctx.beginPath();
+                    ctx.arc(width * 0.2, height * 0.2, 50, 0, Math.PI * 2);
+                    ctx.fill();
+                    for (let i = 0; i < 20; i++) {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.arc(100 + i * 90, 50 + (i % 5) * 40, 2 + (i % 3), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    break;
+
+                case 'character':
+                    // 情侣小人
+                    ctx.fillStyle = '#FF6B9D';
+                    ctx.beginPath();
+                    ctx.arc(width / 2, height / 3, width / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#4A90D9';
+                    ctx.beginPath();
+                    ctx.arc(width / 2 - 5, height / 3 - 3, width / 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(width / 2 - 10, height / 2, 20, height / 2);
+                    ctx.fillStyle = '#FF6B9D';
+                    ctx.fillRect(width / 2 - 15, height / 2, 10, height / 3);
+                    ctx.fillStyle = '#4A90D9';
+                    ctx.fillRect(width / 2 + 5, height / 2, 10, height / 3);
+                    break;
+
+                case 'photo':
+                    // 里程碑照片
+                    const color = options.color || '#FF6B6B';
+                    const name = options.name || 'Memory';
+                    ctx.fillStyle = color;
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 20px "Microsoft YaHei"';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(name, width / 2, height / 2);
+                    ctx.strokeStyle = '#FFF';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(5, 5, width - 10, height - 10);
+                    break;
+
+                case 'landmark':
+                    // 里程碑标记
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(width / 2, height / 2, width / 2 - 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(options.index, width / 2, height / 2);
+                    break;
+            }
+
+            scene.textures.addCanvas(key, canvas);
+        }
+
+        /**
+         * 生成边缘渐变透明的纹理
+         * @param {Phaser.Scene} scene - 当前场景
+         * @param {string} origKey - 原始图片的纹理 key（如 'photo_0'）
+         * @param {number} width - 纹理宽度（应与原始图片一致）
+         * @param {number} height - 纹理高度
+         * @param {number} fadeRadiusRatio - 渐变起始半径占最大半径的比例（0～1），默认 0.7
+         * @returns {Phaser.Textures.CanvasTexture} 新生成的 Canvas 纹理
+         */
+        function createFadeEdgeTexture(scene, origKey, width, height, fadeRadiusRatio = 0.7) {
+            // 1. 获取原始图像数据
+            const origTexture = scene.textures.get(origKey);
+            const sourceImage = origTexture.getSourceImage();  // HTMLImageElement 或 Canvas
+            if (!sourceImage) {
+                console.error('原始纹理未加载完成');
+                return null;
+            }
+
+            // 2. 创建相同尺寸的 CanvasTexture
+            const canvasTexture = scene.textures.createCanvas(`${origKey}_faded`, width, height);
+            const ctx = canvasTexture.canvas.getContext('2d');
+
+            // 3. 绘制原始图片
+            ctx.drawImage(sourceImage, 0, 0, width, height);
+
+            // 4. 利用 globalCompositeOperation = 'destination-in'
+            //    后续绘制的图形将作为 alpha 通道，保留重叠区域，且图形的透明度会直接影响最终的 alpha 值
+            ctx.globalCompositeOperation = 'destination-in';
+
+            // 5. 绘制径向渐变（中心不透明 → 边缘全透明）
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const maxRadius = Math.max(width, height) / 2;
+            const startRadius = maxRadius * fadeRadiusRatio;  // 从半径 70% 处开始渐变（可调整）
+
+            const gradient = ctx.createRadialGradient(centerX, centerY, startRadius, centerX, centerY, maxRadius);
+            gradient.addColorStop(0, 'rgba(0,0,0,1)');   // 内部完全不透明
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');   // 边缘完全透明
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+
+            // 6. 重置混合模式（避免影响后续绘制）
+            ctx.globalCompositeOperation = 'source-over';
+
+            return canvasTexture;
+        }
+
+        /**
+         * 生成径向渐变发光粒子纹理
+         */
+        function createGlowTexture(scene, key, size) {
+            if (scene.textures.exists(key)) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.2, 'rgba(255,255,255,0.9)');
+            gradient.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            scene.textures.addCanvas(key, canvas);
+        }
+
+        /**
+         * 生成心形轮廓坐标点
+         */
+        function generateHeartPoints(cx, cy, s) {
+            const points = [];
+            for (let t = 0; t < Math.PI * 2; t += 0.25) {
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                points.push({ x: cx + x * (s / 16), y: cy - y * (s / 16) });
+            }
+            return points;
+        }
+
+        // ==================== 封面场景 ====================
+        class CoverScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'CoverScene' });
+                this.canOpen = false;
+            }
+
+            create() {
+                // 绘制幕布纹理
+                this.createCurtainTextures();
+
+                // 背景粒子（幕布之后）
+                this.createCoverParticles();
+
+                // 左右幕布精灵
+                this.leftCurtain = this.add.image(0, 0, 'curtain_left')
+                    .setOrigin(0, 0).setDepth(10);
+                this.rightCurtain = this.add.image(GAME_WIDTH / 2, 0, 'curtain_right')
+                    .setOrigin(0, 0).setDepth(10);
+
+                // 聚光灯效果
+                this.createSpotlight();
+
+                // CHAPTER 装饰线
+                const decoG = this.add.graphics().setDepth(12);
+                decoG.lineStyle(2, 0xDAA520, 0.6);
+                decoG.lineBetween(GAME_WIDTH / 2 - 150, GAME_HEIGHT / 2 - 110, GAME_WIDTH / 2 - 60, GAME_HEIGHT / 2 - 110);
+                decoG.lineBetween(GAME_WIDTH / 2 + 60, GAME_HEIGHT / 2 - 110, GAME_WIDTH / 2 + 150, GAME_HEIGHT / 2 - 110);
+
+                const chapterText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 120, '✦ CHAPTER 1 ✦', {
+                    fontSize: '22px',
+                    fontFamily: '"Huninn", "Georgia", serif',
+                    color: '#DAA520',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(12);
+
+                // 标题文字
+                this.titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, '我们的故事', {
+                    fontSize: '96px',
+                    fontFamily: '"Huninn", "Georgia", "STKaiti", serif',
+                    color: '#FFD700',
+                    stroke: '#8B0000',
+                    strokeThickness: 4,
+                    shadow: { offsetX: 3, offsetY: 3, color: '#000', blur: 15, fill: true }
+                }).setOrigin(0.5).setDepth(12);
+
+                this.subtitleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, '—  PRESS START  —', {
+                    fontSize: '36px',
+                    fontFamily: '"Huninn", "Georgia", "STKaiti", serif',
+                    color: '#FFD700',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5).setDepth(12);
+
+                // 副标题呼吸闪烁效果
+                this.tweens.add({
+                    targets: this.subtitleText,
+                    alpha: { from: 1, to: 0.3 },
+                    duration: 1000,
+                    yoyo: true,
+                    repeat: -1
+                });
+
+                // 等待输入
+                this.time.delayedCall(500, () => { this.canOpen = true; });
+                this.input.keyboard.once('keydown', () => this.openCurtains());
+                this.input.once('pointerdown', () => this.openCurtains());
+            }
+
+            createCoverParticles() {
+                // 创建粒子纹理
+                if (!this.textures.exists('particle_cover')) {
+                    const g = this.add.graphics();
+                    g.fillStyle(0xFFFFFF, 1);
+                    g.fillCircle(4, 4, 4);
+                    g.generateTexture('particle_cover', 8, 8);
+                    g.destroy();
+                }
+                // 飘落金色粒子（幕布后方）
+                this.add.particles(0, -10, 'particle_cover', {
+                    x: { min: 0, max: GAME_WIDTH },
+                    y: -10,
+                    speedY: { min: 30, max: 80 },
+                    speedX: { min: -10, max: 10 },
+                    scale: { start: 0.4, end: 0 },
+                    alpha: { start: 0.7, end: 0 },
+                    lifespan: { min: 3000, max: 8000 },
+                    frequency: 200,
+                    quantity: 1,
+                    tint: [0xFFD700, 0xDAA520, 0xFFEC8B, 0xFFFFFF],
+                    blendMode: 'ADD'
+                }).setDepth(1);
+            }
+
+            createCurtainTextures() {
+                const halfW = GAME_WIDTH / 2;
+                const fullH = GAME_HEIGHT;
+                const stripeCount = 14;
+
+                // 左幕布
+                const lg = this.add.graphics();
+                // 底色
+                lg.fillStyle(0x8B0000, 1);
+                lg.fillRect(0, 0, halfW, fullH);
+                // 垂直褶皱
+                const stripeW = halfW / stripeCount;
+                for (let i = 0; i < stripeCount; i++) {
+                    const shade = (i % 2 === 0) ? 0x7A0000 : 0x8B0000;
+                    lg.fillStyle(shade, 1);
+                    lg.fillRect(i * stripeW, 0, stripeW, fullH);
+                }
+                // 金色右边缘镶边
+                lg.fillStyle(0xFFD700, 1);
+                lg.fillRect(halfW - 10, 0, 10, fullH);
+                // 顶部金色装饰
+                lg.fillStyle(0xDAA520, 1);
+                lg.fillRect(0, 0, halfW, 6);
+                // 底部金色装饰
+                lg.fillRect(0, fullH - 6, halfW, 6);
+                lg.generateTexture('curtain_left', halfW, fullH);
+                lg.destroy();
+
+                // 右幕布（镜像）
+                const rg = this.add.graphics();
+                rg.fillStyle(0x8B0000, 1);
+                rg.fillRect(0, 0, halfW, fullH);
+                for (let i = 0; i < stripeCount; i++) {
+                    const shade = (i % 2 === 0) ? 0x7A0000 : 0x8B0000;
+                    rg.fillStyle(shade, 1);
+                    rg.fillRect(i * stripeW, 0, stripeW, fullH);
+                }
+                // 金色左边缘镶边
+                rg.fillStyle(0xFFD700, 1);
+                rg.fillRect(0, 0, 10, fullH);
+                // 顶部金色装饰
+                rg.fillStyle(0xDAA520, 1);
+                rg.fillRect(0, 0, halfW, 6);
+                // 底部金色装饰
+                rg.fillRect(0, fullH - 6, halfW, 6);
+                rg.generateTexture('curtain_right', halfW, fullH);
+                rg.destroy();
+            }
+
+            createSpotlight() {
+                const canvas = document.createElement('canvas');
+                canvas.width = GAME_WIDTH;
+                canvas.height = GAME_HEIGHT;
+                const ctx = canvas.getContext('2d');
+                const gradient = ctx.createRadialGradient(
+                    GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, 80,
+                    GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, GAME_WIDTH * 0.35
+                );
+                gradient.addColorStop(0, 'rgba(255, 215, 0, 0.12)');
+                gradient.addColorStop(0.5, 'rgba(255, 215, 0, 0.04)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                this.textures.addCanvas('spotlight', canvas);
+                this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'spotlight').setDepth(11);
+            }
+
+            openCurtains() {
+                if (!this.canOpen) return;
+                this.canOpen = false;
+                this.input.keyboard.removeAllListeners();
+                this.input.removeAllListeners();
+
+                // 幕布滑开
+                this.tweens.add({
+                    targets: this.leftCurtain,
+                    x: -GAME_WIDTH / 2,
+                    duration: 1200,
+                    ease: 'Cubic.easeIn'
+                });
+                this.tweens.add({
+                    targets: this.rightCurtain,
+                    x: GAME_WIDTH,
+                    duration: 1200,
+                    ease: 'Cubic.easeIn'
+                });
+
+                // 标题淡出
+                this.tweens.add({
+                    targets: [this.titleText, this.subtitleText],
+                    alpha: 0,
+                    duration: 600
+                });
+
+                // 过渡到主游戏
+                this.cameras.main.fadeOut(500, 0, 0, 0);
+                this.time.delayedCall(1400, () => {
+                    this.scene.start('ProposalScene');
+                });
+            }
+        }
+
+        // ==================== 主游戏场景 ====================
+        class ProposalScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'ProposalScene' });
+                this.currentLandmarkIndex = -1;
+                this.currentBG = BGTYPE.DAY;
+                this.isMoving = false;
+                this.hasProposed = false;
+                this.cursors = null;
+                this.pathGraphics = null;
+                this.noClickCount = 0;
+                this.landmarkBadges = [];
+                this.landmarkBubbles = [];
+                this.landmarkGlows = [];
+                this.isFlipping = false;
+                this.spineLine = null;
+            }
+
+            preload() {
+                // 温馨加载提示
+                const loadHint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, '正在加载美好回忆...', {
+                    fontSize: '30px',
+                    fontFamily: '"Huninn", "STKaiti", serif',
+                    color: '#FFB7C5',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(100);
+                this.tweens.add({
+                    targets: loadHint,
+                    alpha: { from: 1, to: 0.5 },
+                    duration: 1500,
+                    yoyo: true,
+                    repeat: -1
+                });
+
+                // 左右爱心
+                const leftHeart = this.add.text(GAME_WIDTH / 2 - 300, GAME_HEIGHT / 2 + 1, '❤️', {
+                    fontSize: '36px'
+                }).setOrigin(0.5).setDepth(100);
+                const rightHeart = this.add.text(GAME_WIDTH / 2 + 300, GAME_HEIGHT / 2 + 1, '❤️', {
+                    fontSize: '36px'
+                }).setOrigin(0.5).setDepth(100);
+                this.tweens.add({
+                    targets: [leftHeart, rightHeart],
+                    scale: { from: 1, to: 1.3 },
+                    duration: 600,
+                    yoyo: true,
+                    repeat: -1
+                });
+
+                // 进度条背景（双层边框）
+                const loadBox = this.add.graphics().setDepth(100);
+                loadBox.fillStyle(0x1a1a2e, 0.85);
+                loadBox.fillRoundedRect(GAME_WIDTH / 2 - 260, GAME_HEIGHT / 2 - 18, 520, 40, 16);
+                loadBox.lineStyle(3, 0xFFD700, 0.7);
+                loadBox.strokeRoundedRect(GAME_WIDTH / 2 - 260, GAME_HEIGHT / 2 - 18, 520, 40, 16);
+                loadBox.lineStyle(1, 0xFFFFFF, 0.25);
+                loadBox.strokeRoundedRect(GAME_WIDTH / 2 - 254, GAME_HEIGHT / 2 - 12, 508, 28, 12);
+
+                const loadBar = this.add.graphics().setDepth(101);
+
+                const percentText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 3, '0%', {
+                    fontSize: '22px',
+                    fontFamily: '"Huninn", "Georgia", "STKaiti", serif',
+                    color: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(101);
+
+                this.load.on('progress', (value) => {
+                    loadBar.clear();
+                    const bw = 508 * value;
+                    // 渐变色模拟：多条不同金粉色窄条
+                    const segments = 10;
+                    const segW = bw / segments;
+                    for (let s = 0; s < segments; s++) {
+                        const t = s / segments;
+                        const r = Math.floor(0xFF * (1 - t) + 0xFF * t);
+                        const g = Math.floor(0x69 * (1 - t) + 0xD7 * t);
+                        const b = Math.floor(0xB4 * (1 - t) + 0x00 * t);
+                        const color = (r << 16) | (g << 8) | b;
+                        loadBar.fillStyle(color, 1);
+                        loadBar.fillRoundedRect(
+                            GAME_WIDTH / 2 - 254 + s * segW,
+                            GAME_HEIGHT / 2 - 16,
+                            segW + 1, 36, 8
+                        );
+                    }
+                    percentText.setText(Math.floor(value * 100) + '%');
+                });
+
+                this.load.on('complete', () => {
+                    loadHint.destroy();
+                    leftHeart.destroy();
+                    rightHeart.destroy();
+                    loadBox.destroy();
+                    loadBar.destroy();
+                    percentText.destroy();
+                });
+
+                // 从assets目录加载真实资源
+                this.load.image('bg_day', 'assets/images/day.png');
+                this.load.image('bg_dusk', 'assets/images/dusk.png');
+                this.load.image('bg_night', 'assets/images/night.png');
+                this.load.image('character', 'assets/images/dog200无背景.png');
+                this.load.image('landmark_0', 'assets/images/金宝150无背景.png');
+                this.load.image('landmark_1', 'assets/images/北海150无背景.png');
+                this.load.image('landmark_2', 'assets/images/清华150无背景.png');
+                this.load.image('landmark_3', 'assets/images/五道口150无背景.png');
+                this.load.image('landmark_4', 'assets/images/鸟巢150无背景.png');
+                this.load.image('landmark_5', 'assets/images/滑雪150无背景.png');
+                this.load.image('landmark_6', 'assets/images/乐高150无背景.png');
+                this.load.image('landmark_7', 'assets/images/家150无背景.png');
+                this.load.image('landmark_8', 'assets/images/家150无背景.png');
+                this.load.image('photo_0', 'assets/images/童年合集600无背景.png');
+                this.load.image('photo_1', 'assets/images/公园合集600.png');
+                this.load.image('photo_2', 'assets/images/学校合集600.jpg');
+                this.load.image('photo_3', 'assets/images/表白600.jpg');
+                this.load.image('photo_4', 'assets/images/演唱会600.jpg');
+                this.load.image('photo_5', 'assets/images/旅行合集600.jpg');
+                this.load.image('photo_6', 'assets/images/成果合集600.jpg');
+                this.load.image('photo_7', 'assets/images/日常合集600.jpg');
+                this.load.image('photo_8', 'assets/images/最喜欢600.jpg');
+                this.load.image('photo_9', 'assets/images/结束封面.jpg');
+                this.load.image('final', 'assets/images/final.jpeg');
+
+                // 加载BGM音频
+                this.load.audio('bgm', 'assets/audio/bgm.mp3');
+            }
+
+            create() {
+                this.cameras.main.fadeIn(500, 0, 0, 0);
+
+                // 初始化输入（键盘 + 手柄）
+                this.initInput();
+
+                // 创建粒子纹理（供烟花、里程碑爆发等使用）
+                this.createParticleTexture();
+
+                // 加载背景
+                this.bgSprite = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'bg_day')
+                    .setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+                this.bgSprite2 = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'bg_day')
+                    .setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setAlpha(0);
+
+                // 绘制里程碑路径
+                this.pathGraphics = this.add.graphics().setDepth(5);
+                this.drawPath();
+
+                // 生成泡泡纹理
+                this.createBubbleTexture();
+
+                // 创建里程碑标记（金环光晕效果）
+                this.landmarkSprites = [];
+                this.landmarkBubbles = [];
+                this.landmarkGlows = [];
+                LANDMARKS.forEach((lm, i) => {
+                    // 柔光光晕（仅已点亮时显示）
+                    const glow = this.add.image(lm.x, lm.y, 'bubble_glow')
+                        .setDepth(8).setAlpha(0).setScale(0.8);
+                    this.landmarkGlows.push(glow);
+
+                    // 金环（第一个点亮，其余很暗）
+                    const ring = this.add.image(lm.x, lm.y, 'bubble_ring')
+                        .setDepth(9).setAlpha(i === 0 ? 0.9 : 0.2)
+                        .setScale(i === 0 ? 1.05 : 0.88);
+                    this.landmarkBubbles.push(ring);
+
+                    const sprite = this.add.image(lm.x, lm.y, `landmark_${i}`)
+                        .setDepth(10)
+                        .setAlpha(i === 0 ? 1 : 0.35);
+                    // 圆形遮罩
+                    const maskGfx = this.make.graphics({ x: lm.x, y: lm.y });
+                    maskGfx.fillStyle(0xFFFFFF, 1);
+                    maskGfx.fillCircle(0, 0, 55);
+                    sprite.setMask(maskGfx.createGeometryMask());
+                    // 呼吸效果
+                    this.tweens.add({
+                        targets: [sprite, ring],
+                        scale: { from: 1, to: 1.15 },
+                        alpha: { from: sprite.alpha, to: sprite.alpha * 0.6 },
+                        duration: 1200,
+                        yoyo: true,
+                        repeat: -1
+                    });
+                    this.landmarkSprites.push(sprite);
+
+                    // 序号徽章
+                    const badge = this.add.text(lm.x + 45, lm.y - 35, `${i + 1}`, {
+                        fontSize: '22px',
+                        fontFamily: '"Huninn", "Georgia", "STKaiti", serif',
+                        color: '#888888',
+                        stroke: '#000000',
+                        strokeThickness: 3
+                    }).setOrigin(0.5).setDepth(11);
+                    this.landmarkBadges.push(badge);
+                });
+                // 初始高亮第一个徽章
+                if (this.landmarkBadges.length > 0) {
+                    this.landmarkBadges[0].setColor('#FFD700');
+                }
+
+                // 创建情侣小人
+                this.character = this.add.image(LANDMARKS[0].x, LANDMARKS[0].y + 70, 'character')
+                    .setDepth(20);
+                this.currentLandmarkIndex = 0;
+
+                // 相册：纸张阴影 + 白色底纸 + 照片，统一倾斜
+                this.photoCenterX = 300;
+                this.photoCenterY = 400;
+                this.photoBaseAngle = -4;
+
+                this.photoShadow = this.add.rectangle(
+                    this.photoCenterX + 6, this.photoCenterY + 6, 510, 590, 0x000000, 0.2
+                ).setDepth(28).setAngle(this.photoBaseAngle);
+
+                this.photoPaper = this.add.rectangle(
+                    this.photoCenterX, this.photoCenterY, 510, 590, 0xFFFFF8, 0.9
+                ).setDepth(29).setAngle(this.photoBaseAngle);
+                this.photoPaper.setStrokeStyle(2, 0xFFD700, 0.5);
+
+                this.photoSprite = this.add.image(this.photoCenterX, this.photoCenterY, 'photo_0')
+                    .setOrigin(0.5)
+                    .setDepth(30)
+                    .setAngle(this.photoBaseAngle);
+
+                // 顶部爱心进度条
+                this.topProgressText = this.add.text(GAME_WIDTH / 2, 14, '', {
+                    fontSize: '20px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFD700',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(0.5, 0).setDepth(45);
+                this.heartProgress = [];
+                this.updateHeartProgress();
+
+                // 显示当前进度文字
+                this.progressText = this.add.text(30, 60, '🏰 回到我们的故事开始的地方...', {
+                    fontSize: '44px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setDepth(40);
+
+                // 操作提示
+                this.hintText = this.add.text(GAME_WIDTH - 30, GAME_HEIGHT - 30,
+                    '←→ / 手柄摇杆移动', {
+                    fontSize: '18px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                    align: 'right'
+                }).setOrigin(1, 1).setDepth(40);
+
+                // 初始化求婚UI（隐藏）
+                this.createProposalUI();
+
+                // 初始化烟花粒子系统
+                this.initFireworks();
+
+                // 启动BGM（模拟）
+                this.startBGM();
+
+                // 监听手柄连接
+                this.input.gamepad.once('connected', (pad) => {
+                    console.log('游戏手柄已连接:', pad.id);
+                    this.showToast('🎮 手柄已连接');
+                });
+
+            }
+
+            initInput() {
+                // 键盘方向键
+                this.cursors = this.input.keyboard.createCursorKeys();
+
+                // 手柄支持
+                if (this.input.gamepad) {
+                    this.input.gamepad.on('down', (pad, button) => {
+                        if (this.hasProposed) return;
+                        // A键（确认）
+                        if (button.index === 0 && this.proposalUIVisible) {
+                            this.handleYes();
+                        }
+                        // B键（取消）
+                        if (button.index === 1 && this.proposalUIVisible) {
+                            this.handleNo();
+                        }
+                    });
+                }
+            }
+
+            createProposalUI() {
+                const cx = GAME_WIDTH / 2;
+                const cy = GAME_HEIGHT / 2;
+
+                // 背景遮罩
+                this.proposalMask = this.add.graphics()
+                    .fillStyle(0x000000, 0.7)
+                    .fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
+                    .setDepth(100)
+                    .setVisible(false);
+
+                // 旋转戒指图标
+                try {
+                    const ringG = this.add.graphics();
+                    ringG.lineStyle(5, 0xFFD700, 1);
+                    ringG.strokeCircle(30, 30, 25);
+                    ringG.lineStyle(3, 0xFFFFFF, 0.5);
+                    ringG.strokeCircle(30, 30, 20);
+                    ringG.fillStyle(0xFFFFFF, 0.9);
+                    ringG.fillTriangle(30, 2, 24, 12, 36, 12);
+                    ringG.generateTexture('ring_icon', 60, 60);
+                    ringG.destroy();
+
+                    this.ringSprite = this.add.image(cx, cy - 210, 'ring_icon')
+                        .setDepth(101).setVisible(false);
+                    this.tweens.add({
+                        targets: this.ringSprite,
+                        angle: 360,
+                        duration: 3000,
+                        repeat: -1
+                    });
+                } catch (e) {
+                    console.warn('戒指图标创建失败:', e.message);
+                    this.ringSprite = null;
+                }
+
+                // 浮动爱心粒子
+                try {
+                    this.proposalHearts = this.add.particles(cx, GAME_HEIGHT, 'particle', {
+                        x: { min: GAME_WIDTH * 0.25, max: GAME_WIDTH * 0.75 },
+                        y: GAME_HEIGHT + 20,
+                        speedY: { min: -60, max: -120 },
+                        speedX: { min: -20, max: 20 },
+                        scale: { start: 0.5, end: 0 },
+                        alpha: { start: 0.8, end: 0 },
+                        lifespan: 4000,
+                        frequency: 300,
+                        quantity: 1,
+                        tint: [0xFF6B9D, 0xFF4081, 0xFF69B4, 0xFFB7C5],
+                        blendMode: 'ADD',
+                        emitting: false
+                    }).setDepth(99);
+                } catch (e) {
+                    console.warn('爱心粒子创建失败:', e.message);
+                    this.proposalHearts = null;
+                }
+
+                // 求婚文字
+                this.proposalText = this.add.text(cx, cy - 100, '💍 你愿意嫁给我吗？ 💍', {
+                    fontSize: '64px',
+                    fontFamily: '"Huninn", "STKaiti", serif',
+                    color: '#FFFFFF',
+                    stroke: '#FF69B4',
+                    strokeThickness: 6,
+                    shadow: { offsetX: 3, offsetY: 3, color: '#000', blur: 10, fill: true }
+                }).setOrigin(0.5).setDepth(101).setVisible(false);
+
+                // Yes按钮
+                this.yesButton = this.add.container(cx - 120, cy + 80).setDepth(101).setVisible(false);
+                const yesBg = this.add.graphics()
+                    .fillStyle(0x4CAF50, 1)
+                    .fillRoundedRect(-80, -30, 160, 60, 15)
+                    .lineStyle(3, 0xFFFFFF, 0.8)
+                    .strokeRoundedRect(-80, -30, 160, 60, 15);
+                const yesText = this.add.text(0, 0, '💖 Yes!', {
+                    fontSize: '32px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFFFFF',
+                    stroke: '#2E7D32',
+                    strokeThickness: 2
+                }).setOrigin(0.5);
+                this.yesButton.add([yesBg, yesText]);
+                this.yesButton.setSize(160, 60);
+                this.yesButton.setInteractive({ useHandCursor: true })
+                    .on('pointerover', () => yesBg.clear().fillStyle(0x66BB6A, 1).fillRoundedRect(-80, -30, 160, 60, 15).lineStyle(3, 0xFFFFFF, 0.8).strokeRoundedRect(-80, -30, 160, 60, 15))
+                    .on('pointerout', () => yesBg.clear().fillStyle(0x4CAF50, 1).fillRoundedRect(-80, -30, 160, 60, 15).lineStyle(3, 0xFFFFFF, 0.8).strokeRoundedRect(-80, -30, 160, 60, 15))
+                    .on('pointerdown', () => this.handleYes());
+
+                // No按钮
+                this.noButton = this.add.container(cx + 120, cy + 80).setDepth(101).setVisible(false);
+                const noBg = this.add.graphics()
+                    .fillStyle(0xF44336, 1)
+                    .fillRoundedRect(-80, -30, 160, 60, 15)
+                    .lineStyle(3, 0xFFFFFF, 0.8)
+                    .strokeRoundedRect(-80, -30, 160, 60, 15);
+                const noText = this.add.text(0, 0, '😢 No...', {
+                    fontSize: '32px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFFFFF',
+                    stroke: '#C62828',
+                    strokeThickness: 2
+                }).setOrigin(0.5);
+                this.noButton.add([noBg, noText]);
+                this.noButton.setSize(160, 60);
+                this.noButton.setInteractive({ useHandCursor: true })
+                    .on('pointerover', () => noBg.clear().fillStyle(0xEF5350, 1).fillRoundedRect(-80, -30, 160, 60, 15).lineStyle(3, 0xFFFFFF, 0.8).strokeRoundedRect(-80, -30, 160, 60, 15))
+                    .on('pointerout', () => noBg.clear().fillStyle(0xF44336, 1).fillRoundedRect(-80, -30, 160, 60, 15).lineStyle(3, 0xFFFFFF, 0.8).strokeRoundedRect(-80, -30, 160, 60, 15))
+                    .on('pointerdown', () => this.handleNo());
+
+                this.proposalUIVisible = false;
+            }
+
+            initFireworks() {
+                // 创建发光粒子纹理
+                createGlowTexture(this, 'glow', 32);
+
+                const colors = [0xFFD700, 0xFF69B4, 0xFFFFFF, 0xFF6B6B, 0xFFB347, 0xE6A8FF, 0xFF4081, 0xFFEC8B];
+
+                this.fireworkEmitters = [];
+                for (let i = 0; i < 8; i++) {
+                    const emitter = this.add.particles(0, 0, 'glow', {
+                        speed: { min: 120, max: 500 },
+                        angle: { min: 0, max: 360 },
+                        scale: { start: 0.5, end: 0 },
+                        alpha: { start: 1, end: 0 },
+                        lifespan: { min: 1200, max: 2500 },
+                        gravityY: 80,
+                        blendMode: 'ADD',
+                        emitting: false,
+                        quantity: 40,
+                        tint: colors
+                    }).setDepth(200);
+                    this.fireworkEmitters.push(emitter);
+                }
+            }
+
+            startBGM() {
+                this.bgmSound = this.sound.add('bgm', { loop: true, volume: 0.5 });
+                // 等待用户首次交互后再播放（应对浏览器自动播放限制）
+                const tryPlay = () => {
+                    if (this.bgmSound && !this.bgmSound.isPlaying) {
+                        this.bgmSound.play();
+                    }
+                };
+                this.input.once('pointerdown', tryPlay);
+                this.input.keyboard.once('keydown', tryPlay);
+                this.time.delayedCall(3000, () => {
+                    if (this.bgmSound && !this.bgmSound.isPlaying) {
+                        this.bgmSound.play();
+                    }
+                });
+                this.showToast('🎵 背景音乐已准备好，点击屏幕开始');
+            }
+
+            showToast(message) {
+                const toast = this.add.text(GAME_WIDTH / 2, 100, message, {
+                    fontSize: '28px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                    backgroundColor: '#FF69B4',
+                    padding: { x: 20, y: 10 }
+                }).setOrigin(0.5).setDepth(300);
+
+                this.tweens.add({
+                    targets: toast,
+                    alpha: { from: 1, to: 0 },
+                    y: { from: 100, to: 50 },
+                    duration: 2000,
+                    onComplete: () => toast.destroy()
+                });
+            }
+
+            createBubbleTexture() {
+                if (this.textures.exists('bubble_ring')) return;
+                const size = 160;
+
+                // 金环 + 内圈光环
+                const c2 = document.createElement('canvas');
+                c2.width = size; c2.height = size;
+                const ctx2 = c2.getContext('2d');
+                ctx2.beginPath();
+                ctx2.arc(size / 2, size / 2, size * 0.42, 0, Math.PI * 2);
+                ctx2.strokeStyle = 'rgba(255,215,0,0.8)';
+                ctx2.lineWidth = 3.5;
+                ctx2.stroke();
+                ctx2.beginPath();
+                ctx2.arc(size / 2, size / 2, size * 0.38, 0, Math.PI * 2);
+                ctx2.strokeStyle = 'rgba(255,255,255,0.35)';
+                ctx2.lineWidth = 1.5;
+                ctx2.stroke();
+                this.textures.addCanvas('bubble_ring', c2);
+
+                // 柔光光晕（用于已点亮地标）
+                const c3 = document.createElement('canvas');
+                c3.width = size * 2; c3.height = size * 2;
+                const ctx3 = c3.getContext('2d');
+                const g3 = ctx3.createRadialGradient(size, size, size * 0.3, size, size, size);
+                g3.addColorStop(0, 'rgba(255,215,0,0.4)');
+                g3.addColorStop(0.5, 'rgba(255,215,0,0.1)');
+                g3.addColorStop(1, 'rgba(255,215,0,0)');
+                ctx3.fillStyle = g3;
+                ctx3.fillRect(0, 0, size * 2, size * 2);
+                this.textures.addCanvas('bubble_glow', c3);
+            }
+
+            showTitleCard(name) {
+                const card = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, name, {
+                    fontSize: '56px',
+                    fontFamily: '"Huninn", "STKaiti", serif',
+                    color: '#FFD700',
+                    stroke: '#000000',
+                    strokeThickness: 6,
+                    shadow: { offsetX: 2, offsetY: 2, color: '#000', blur: 10, fill: true }
+                }).setOrigin(0.5).setDepth(80).setScale(0).setAlpha(0);
+
+                // 弹入
+                this.tweens.add({
+                    targets: card,
+                    scale: 1.1,
+                    alpha: 1,
+                    duration: 400,
+                    ease: 'Back.easeOut'
+                });
+                // 停留后消失
+                this.tweens.add({
+                    targets: card,
+                    scale: 0.8,
+                    alpha: 0,
+                    duration: 500,
+                    delay: 1500,
+                    ease: 'Sine.easeIn',
+                    onComplete: () => card.destroy()
+                });
+            }
+
+            playChime() {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.3);
+                } catch (e) {
+                    // 静默忽略
+                }
+            }
+
+            createParticleTexture() {
+                if (this.textures.exists('particle')) return;
+                const g = this.add.graphics();
+                g.fillStyle(0xFFFFFF, 1);
+                g.fillCircle(4, 4, 4);
+                g.generateTexture('particle', 8, 8);
+                g.destroy();
+            }
+
+            flipToPhoto(index) {
+                if (this.isFlipping) return;
+                this.isFlipping = true;
+
+                // 书脊线（翻页瞬间显示）
+                if (!this.spineLine) {
+                    this.spineLine = this.add.graphics().setDepth(31);
+                }
+                const px = this.photoSprite.x;
+
+                // 合上当前页
+                this.tweens.add({
+                    targets: [this.photoSprite, this.photoPaper, this.photoShadow],
+                    scaleX: 0,
+                    duration: 300,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => {
+                        // 切换纹理 + 随机角度（照片+底纸+阴影同步旋转）
+                        this.photoSprite.setTexture(`photo_${index}`);
+                        const newAngle = Phaser.Math.Between(-6, 3);
+                        this.photoSprite.setAngle(newAngle);
+                        this.photoPaper.setAngle(newAngle);
+                        this.photoShadow.setAngle(newAngle);
+
+                        // 显示书脊线
+                        this.spineLine.clear();
+                        this.spineLine.lineStyle(4, 0xFFD700, 0.8);
+                        this.spineLine.lineBetween(px, 390, px, 410);
+                        this.time.delayedCall(100, () => this.spineLine.clear());
+
+                        // 翻开新页
+                        this.tweens.add({
+                            targets: [this.photoSprite, this.photoPaper, this.photoShadow],
+                            scaleX: 1,
+                            duration: 300,
+                            ease: 'Sine.easeInOut',
+                            onComplete: () => {
+                                this.isFlipping = false;
+                            }
+                        });
+                    }
+                });
+            }
+
+            generateFadedPhotos() {
+                for (let i = 0; i <= 8; i++) {
+                    const key = `photo_${i}`;
+                    if (this.textures.exists(key)) {
+                        const tex = this.textures.get(key);
+                        const src = tex.getSourceImage();
+                        if (src && !this.textures.exists(`${key}_faded`)) {
+                            createFadeEdgeTexture(this, key, src.width, src.height);
+                        }
+                    }
+                }
+            }
+
+            crossfadeBackground(bgKey) {
+                // 在新图层上设置目标背景
+                this.bgSprite2.setTexture(bgKey).setAlpha(0);
+                // 双图层交叉淡入淡出
+                this.tweens.add({
+                    targets: this.bgSprite,
+                    alpha: 0,
+                    duration: 1500,
+                    ease: 'Sine.easeInOut'
+                });
+                this.tweens.add({
+                    targets: this.bgSprite2,
+                    alpha: 1,
+                    duration: 1500,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => {
+                        // 交换主次图层
+                        const temp = this.bgSprite;
+                        this.bgSprite = this.bgSprite2;
+                        this.bgSprite2 = temp;
+                    }
+                });
+            }
+
+            updateHeartProgress() {
+                const idx = this.currentLandmarkIndex;
+                const total = LANDMARKS.length;
+                const heartSpacing = 55;
+                const startX = (GAME_WIDTH - (total - 1) * heartSpacing) / 2;
+                const heartY = 48;
+
+                // 首次创建爱心
+                if (this.heartProgress.length === 0) {
+                    for (let i = 0; i < total; i++) {
+                        const heart = this.add.text(startX + i * heartSpacing, heartY, '🤍', {
+                            fontSize: '28px'
+                        }).setOrigin(0.5).setDepth(45);
+                        this.heartProgress.push(heart);
+                    }
+                }
+
+                // 更新爱心状态
+                this.heartProgress.forEach((heart, i) => {
+                    if (i < idx) {
+                        heart.setText('❤️').setFontSize(28);
+                    } else if (i === idx) {
+                        heart.setText('❤️‍🔥').setFontSize(36);
+                    } else {
+                        heart.setText('🤍').setFontSize(24);
+                    }
+                });
+
+                this.topProgressText.setText(`${idx + 1} / ${total}`);
+            }
+
+            drawPath() {
+                this.pathGraphics.clear();
+                const traversed = this.currentLandmarkIndex;
+                for (let i = 0; i < LANDMARKS.length - 1; i++) {
+                    const from = LANDMARKS[i];
+                    const to = LANDMARKS[i + 1];
+                    const isTraversed = i < traversed;
+                    this.pathGraphics.lineStyle(
+                        isTraversed ? 6 : 3,
+                        isTraversed ? 0xFFD700 : 0xFFFFFF,
+                        isTraversed ? 0.85 : 0.2
+                    );
+                    this.pathGraphics.beginPath();
+                    this.pathGraphics.moveTo(from.x, from.y);
+                    // 用多个线段模拟曲线
+                    const midX = (from.x + to.x) / 2;
+                    const midY = Math.min(from.y, to.y) - 40;
+                    const segments = 8;
+                    for (let s = 1; s <= segments; s++) {
+                        const t = s / segments;
+                        const bx = (1 - t) * (1 - t) * from.x + 2 * (1 - t) * t * midX + t * t * to.x;
+                        const by = (1 - t) * (1 - t) * from.y + 2 * (1 - t) * t * midY + t * t * to.y;
+                        this.pathGraphics.lineTo(bx, by);
+                    }
+                    this.pathGraphics.strokePath();
+                }
+            }
+
+            update(time, delta) {
+                if (this.hasProposed) {
+                    // 烟花效果已激活，不需要额外操作
+                    return;
+                }
+
+                if (this.proposalUIVisible) {
+                    // 求婚界面显示时，禁止移动
+                    return;
+                }
+
+                // 处理移动输入
+                let moveDirection = 0;
+
+                // 键盘输入
+                if (this.cursors.left.isDown) moveDirection = -1;
+                if (this.cursors.right.isDown) moveDirection = 1;
+
+                // 手柄输入
+                if (this.input.gamepad && this.input.gamepad.total > 0) {
+                    // 方案1：强制获取第一个物理Xbox手柄（跳过虚拟手柄vJoy）
+                    let pad = null;
+                    // 遍历所有手柄，找到非虚拟手柄的Xbox手柄
+                    for (let i = 0; i < this.input.gamepad.total; i++) {
+                        const currentPad = this.input.gamepad.getPad(i);
+                        // 过滤掉vJoy虚拟手柄，匹配真实Xbox手柄
+                        if (currentPad.id && !currentPad.id.includes('vJoy')) {
+                            pad = currentPad;
+                            break;
+                        }
+                    }
+
+                    if (pad) {
+                        const DEADZONE = 0.15;
+                        let leftX = 0;
+                        if (pad.axes && pad.axes[0]) {
+                            leftX = pad.axes[0].getValue();
+                            if (Math.abs(leftX) < DEADZONE) leftX = 0;
+                        }
+                        const dpadLeft = pad.left;
+                        const dpadRight = pad.right;
+
+                        if (Math.abs(leftX) > 0) {
+                            moveDirection = leftX > 0 ? 1 : -1;
+                        }
+                        if (moveDirection === 0) {
+                            if (dpadLeft) moveDirection = -1;
+                            if (dpadRight) moveDirection = 1;
+                        }
+                    }
+                }
+
+                // 如果有移动输入且不在移动中
+                if (moveDirection !== 0 && !this.isMoving) {
+                    let nextIndex = this.currentLandmarkIndex;
+
+                    if (moveDirection > 0 && this.currentLandmarkIndex < LANDMARKS.length - 1) {
+                        nextIndex = this.currentLandmarkIndex + 1;
+                    } else if (moveDirection < 0 && this.currentLandmarkIndex > 0) {
+                        nextIndex = this.currentLandmarkIndex - 1;
+                    }
+
+                    if (nextIndex !== this.currentLandmarkIndex) {
+                        this.moveToLandmark(nextIndex);
+                    }
+                }
+            }
+
+            moveToLandmark(index) {
+                this.isMoving = true;
+                const target = LANDMARKS[index];
+                const isForward = index > this.currentLandmarkIndex;
+                this.character.setScale(isForward ? 1 : -1, 1);
+                const startPos = { x: this.character.x, y: this.character.y };
+                const distance = Phaser.Math.Distance.Between(startPos.x, startPos.y, target.x, target.y + 50);
+                const duration = Math.max(500, Math.min(1500, distance * 1.5));
+
+                this.tweens.add({
+                    targets: this.character,
+                    x: target.x,
+                    y: target.y + 50,
+                    duration: duration,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => {
+                        this.isMoving = false;
+                        this.currentLandmarkIndex = index;
+                        this.onLandmarkReached(index);
+                    }
+                });
+            }
+
+            onLandmarkReached(index) {
+                // 在地标位置发射小型粒子爆发
+                const lm = LANDMARKS[index];
+                const spark = this.add.particles(lm.x, lm.y, 'particle', {
+                    speed: { min: 50, max: 150 },
+                    scale: { start: 0.4, end: 0 },
+                    lifespan: 600,
+                    quantity: 12,
+                    tint: [0xFFD700, 0xFFFFFF, 0xFF69B4],
+                    emitting: false
+                }).setDepth(25);
+                spark.explode(12);
+                this.time.delayedCall(1000, () => spark.destroy());
+
+                // 翻页动画切换照片
+                this.flipToPhoto(index);
+
+                // 更新进度文字（仅显示地标名称）
+                this.progressText.setText(lm.name);
+
+                // 标题卡弹出
+                this.showTitleCard(lm.name);
+
+                // 到达音效
+                this.playChime();
+
+                // 更新顶部爱心进度和徽章
+                this.updateHeartProgress();
+                this.landmarkBadges.forEach((badge, i) => {
+                    badge.setColor(i <= index ? '#FFD700' : '#888888');
+                });
+
+                // 点亮当前地标：先停止呼吸动画，再闪光
+                const curRing = this.landmarkBubbles[index];
+                const curSprite = this.landmarkSprites[index];
+                const curGlow = this.landmarkGlows[index];
+
+                if (curRing && curSprite) {
+                    // 停止该地标的呼吸动画
+                    this.tweens.killTweensOf(curRing);
+                    this.tweens.killTweensOf(curSprite);
+
+                    // 闪光动画：金环瞬间变白放大
+                    curRing.setTint(0xFFFFFF);
+                    this.tweens.add({
+                        targets: curRing,
+                        scale: 1.6,
+                        alpha: 1,
+                        duration: 300,
+                        yoyo: true,
+                        ease: 'Sine.easeOut',
+                        onComplete: () => {
+                            curRing.clearTint();
+                            curRing.setAlpha(0.9).setScale(1.05);
+                        }
+                    });
+                    // 光晕渐显
+                    if (curGlow) {
+                        this.tweens.killTweensOf(curGlow);
+                        this.tweens.add({
+                            targets: curGlow,
+                            alpha: 0.7,
+                            duration: 600,
+                            ease: 'Sine.easeOut'
+                        });
+                        // 光晕持续脉动
+                        this.tweens.add({
+                            targets: curGlow,
+                            alpha: { from: 0.7, to: 0.35 },
+                            scale: { from: 0.8, to: 0.95 },
+                            duration: 2000,
+                            yoyo: true,
+                            repeat: -1,
+                            delay: 600
+                        });
+                    }
+                    // 地标图片变亮
+                    this.tweens.add({
+                        targets: curSprite,
+                        alpha: 1,
+                        duration: 400
+                    });
+                    // 弹跳
+                    this.tweens.add({
+                        targets: curSprite,
+                        scale: { from: 1.1, to: 1.3 },
+                        duration: 500,
+                        yoyo: true,
+                        repeat: 2
+                    });
+                }
+
+                // 之前走过的保持金色
+                for (let i = 0; i < index; i++) {
+                    const prevRing = this.landmarkBubbles[i];
+                    const prevSprite = this.landmarkSprites[i];
+                    if (prevRing) {
+                        this.tweens.killTweensOf(prevRing);
+                        prevRing.setAlpha(0.85).setScale(1.05);
+                    }
+                    if (prevSprite) {
+                        this.tweens.killTweensOf(prevSprite);
+                        prevSprite.setAlpha(1);
+                    }
+                }
+
+                // 检查背景切换
+                const progress = (index + 1) / LANDMARKS.length;
+                let newBG = this.currentBG;
+
+                if (progress > 2 / 3 && this.currentBG !== BGTYPE.NIGHT) {
+                    newBG = BGTYPE.NIGHT;
+                } else if (progress > 1 / 3 && this.currentBG !== BGTYPE.DUSK && this.currentBG !== BGTYPE.NIGHT) {
+                    newBG = BGTYPE.DUSK;
+                }
+
+                if (newBG !== this.currentBG) {
+                    this.currentBG = newBG;
+                    const bgKey = newBG === BGTYPE.DAY ? 'bg_day' :
+                        (newBG === BGTYPE.DUSK ? 'bg_dusk' : 'bg_night');
+                    this.crossfadeBackground(bgKey);
+
+                    // 显示背景切换提示
+                    const bgNames = { day: '☀️ 白天', dusk: '🌅 黄昏', night: '🌙 夜晚' };
+                    this.showToast(bgNames[newBG]);
+                }
+
+                // 检查是否到达最后一个里程碑
+                if (index === LANDMARKS.length - 1 && !this.proposalUIVisible && !this.hasProposed) {
+                    this.showProposal();
+                }
+
+                // 更新路径显示
+                this.drawPath();
+            }
+
+            showProposal() {
+                this.proposalUIVisible = true;
+
+                // BGM渐停（慢速淡出，不突兀）
+                if (this.bgmSound && this.bgmSound.isPlaying) {
+                    this.tweens.add({
+                        targets: this.bgmSound,
+                        volume: 0,
+                        duration: 3000
+                    });
+                }
+
+                // 显示遮罩
+                this.proposalMask.setVisible(true);
+
+                // 启动浮动爱心
+                if (this.proposalHearts) this.proposalHearts.emitting = true;
+
+                // 第1步：戒指弹出
+                if (this.ringSprite) {
+                    this.ringSprite.setVisible(true).setScale(0);
+                    this.tweens.add({
+                        targets: this.ringSprite,
+                        scale: 1.2,
+                        duration: 500,
+                        ease: 'Back.easeOut'
+                    });
+                }
+
+                // 第2步：文字弹出
+                this.proposalText.setVisible(true).setScale(0);
+                this.tweens.add({
+                    targets: this.proposalText,
+                    scale: 1,
+                    duration: 500,
+                    delay: 150,
+                    ease: 'Back.easeOut'
+                });
+
+                // 第3步：Yes按钮（400ms后）
+                this.time.delayedCall(400, () => {
+                    this.yesButton.setVisible(true).setScale(0);
+                    this.tweens.add({
+                        targets: this.yesButton,
+                        scale: 1,
+                        duration: 400,
+                        ease: 'Back.easeOut'
+                    });
+                });
+
+                // 第4步：No按钮（800ms后）
+                this.time.delayedCall(800, () => {
+                    this.noButton.setVisible(true).setScale(0);
+                    this.tweens.add({
+                        targets: this.noButton,
+                        scale: 1,
+                        duration: 400,
+                        ease: 'Back.easeOut'
+                    });
+                });
+            }
+
+            handleYes() {
+                this.hasProposed = true;
+                this.proposalUIVisible = false;
+
+                // 停止BGM，准备庆祝
+                if (this.bgmSound) {
+                    this.bgmSound.stop();
+                }
+
+                // 隐藏UI
+                this.proposalMask.setVisible(false);
+                this.proposalText.setVisible(false);
+                if (this.ringSprite) this.ringSprite.setVisible(false);
+                this.yesButton.setVisible(false);
+                this.noButton.setVisible(false);
+                if (this.proposalHearts) this.proposalHearts.emitting = false;
+                // 隐藏操作提示
+                this.hintText.setVisible(false);
+
+                // 播放庆祝BGM（稍大音量）
+                this.time.delayedCall(500, () => {
+                    this.celebrationSound = this.sound.add('bgm', { loop: true, volume: 0.7 });
+                    this.celebrationSound.play();
+                });
+                // 显示最后的里程碑照片
+                const finalPhoto = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'photo_9')
+                    .setOrigin(0.5)
+                    .setDepth(50)
+                    .setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+
+                // 显示庆祝文字
+                const celebrateText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 300, '💍 永远幸福地在一起！ 💍', {
+                    fontSize: '72px',
+                    fontFamily: '"Huninn", "STKaiti", sans-serif',
+                    color: '#FFD700',
+                    stroke: '#FF69B4',
+                    strokeThickness: 8,
+                    shadow: { offsetX: 4, offsetY: 4, color: '#000', blur: 15, fill: true }
+                }).setOrigin(0.5).setDepth(150);
+
+                this.tweens.add({
+                    targets: celebrateText,
+                    scale: { from: 0.5, to: 1.2 },
+                    yoyo: true,
+                    repeat: -1,
+                    duration: 800
+                });
+
+                // 播放庆祝序列
+                this.startCelebration();
+
+                this.showToast('💖 我愿意！ 💖');
+                this.progressText.setText('💍 永远幸福地在一起！ 💍');
+            }
+
+            handleNo() {
+                // No按钮缩小，Yes按钮变大
+                this.noClickCount++;
+                const noScale = Math.max(0.3, this.noButton.scaleX * 0.9);
+                this.noButton.setScale(noScale);
+                const yesScale = Math.min(2.0, this.yesButton.scaleX * 1.1);
+                this.yesButton.setScale(yesScale);
+
+                // No按钮逃跑
+                const newX = Phaser.Math.Between(200, GAME_WIDTH - 200);
+                const newY = Phaser.Math.Between(200, GAME_HEIGHT - 200);
+                this.tweens.add({
+                    targets: this.noButton,
+                    x: newX,
+                    y: newY,
+                    duration: 300,
+                    ease: 'Power2'
+                });
+
+                // 随机俏皮话
+                const messages = ['再考虑一下嘛~', '你确定？', '我会一直等你的~', '你的心不会骗你~'];
+                this.showToast('😢 ' + Phaser.Math.RND.pick(messages));
+            }
+
+            startCelebration() {
+                // === 阶段1：心形爆发 (0-6s) ===
+                // 中央大爆发
+                const heartCenter = this.add.particles(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'glow', {
+                    speed: { min: 80, max: 200 },
+                    angle: { min: 0, max: 360 },
+                    scale: { start: 0.6, end: 0 },
+                    lifespan: 4000,
+                    gravityY: 30,
+                    blendMode: 'ADD',
+                    emitting: false,
+                    quantity: 80,
+                    tint: [0xFF69B4, 0xFF1493, 0xFF6B9D, 0xFFD700]
+                }).setDepth(200);
+                heartCenter.explode(80);
+                this.time.delayedCall(5000, () => heartCenter.destroy());
+
+                // 心形轮廓爆发（更大、更密、留存更久）
+                const heartPts = generateHeartPoints(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, 240);
+                heartPts.forEach((pt) => {
+                    const p = this.add.particles(pt.x, pt.y, 'glow', {
+                        speed: { min: 10, max: 40 },
+                        scale: { start: 0.45, end: 0 },
+                        lifespan: 5000,
+                        tint: [0xFF69B4, 0xFFD700, 0xFF1493],
+                        blendMode: 'ADD',
+                        emitting: false,
+                        quantity: 6
+                    }).setDepth(200);
+                    p.explode(6);
+                    this.time.delayedCall(6000, () => p.destroy());
+                });
+
+                // 0.8s后心形二次爆发（更亮更大）
+                this.time.delayedCall(800, () => {
+                    const heartPts2 = generateHeartPoints(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, 260);
+                    heartPts2.forEach((pt, i) => {
+                        if (i % 3 !== 0) return;
+                        const p2 = this.add.particles(pt.x, pt.y, 'glow', {
+                            speed: { min: 30, max: 100 },
+                            scale: { start: 0.55, end: 0 },
+                            lifespan: 4500,
+                            tint: [0xFFD700, 0xFF69B4],
+                            blendMode: 'ADD',
+                            emitting: false,
+                            quantity: 8
+                        }).setDepth(200);
+                        p2.explode(8);
+                        this.time.delayedCall(5500, () => p2.destroy());
+                    });
+                });
+
+                // === 阶段2：密集烟花 + 花瓣雨 (0-10s) ===
+                this.time.addEvent({
+                    delay: 700,
+                    callback: () => {
+                        if (!this.hasProposed) return;
+                        const rx = Phaser.Math.Between(200, GAME_WIDTH - 200);
+                        const ry = Phaser.Math.Between(80, GAME_HEIGHT * 0.45);
+                        const em = this.fireworkEmitters[Phaser.Math.Between(0, 7)];
+                        em.setPosition(rx, ry);
+                        em.explode(Phaser.Math.Between(25, 45));
+                    },
+                    repeat: 13,
+                    startAt: 0
+                });
+
+                // 花瓣雨
+                this.petalEmitter = this.add.particles(0, -30, 'glow', {
+                    x: { min: 0, max: GAME_WIDTH },
+                    y: -30,
+                    speedY: { min: 50, max: 140 },
+                    speedX: { min: -15, max: 15 },
+                    rotate: { min: 0, max: 360 },
+                    angularVelocity: { min: -100, max: 100 },
+                    scale: { min: 0.15, max: 0.45 },
+                    lifespan: 8000,
+                    alpha: { start: 0.9, end: 0.15 },
+                    tint: [0xFFB7C5, 0xFF6B9D, 0xFF4081, 0xFFC0CB, 0xFF69B4],
+                    blendMode: 'ADD',
+                    emitting: true,
+                    frequency: 140,
+                    quantity: 2,
+                    gravityY: 15
+                }).setDepth(190);
+
+                // === 阶段3：金色光尘 (5-15s) ===
+                this.time.delayedCall(5000, () => {
+                    this.dustEmitter = this.add.particles(0, GAME_HEIGHT + 20, 'glow', {
+                        x: { min: 100, max: GAME_WIDTH - 100 },
+                        y: GAME_HEIGHT + 20,
+                        speedY: { min: -20, max: -70 },
+                        speedX: { min: -10, max: 10 },
+                        scale: { start: 0.12, end: 0 },
+                        alpha: { start: 0.7, end: 0 },
+                        lifespan: { min: 4000, max: 8000 },
+                        tint: [0xFFD700, 0xFFA500, 0xFFEC8B, 0xFFFFFF],
+                        blendMode: 'ADD',
+                        emitting: true,
+                        frequency: 90,
+                        quantity: 2,
+                        rotate: { min: 0, max: 360 },
+                        angularVelocity: { min: -20, max: 20 }
+                    }).setDepth(195);
+                    this.time.delayedCall(10000, () => {
+                        if (this.dustEmitter) this.dustEmitter.stop();
+                    });
+                });
+
+                // 背景闪烁
+                this.tweens.add({
+                    targets: [this.bgSprite, this.bgSprite2],
+                    alpha: { from: 1, to: 0.7 },
+                    duration: 500,
+                    yoyo: true,
+                    repeat: -1
+                });
+
+                // === 阶段4：照片蒙太奇 (12-20s) ===
+                this.time.delayedCall(12000, () => {
+                    this.startPhotoMontage();
+                });
+
+                // === 阶段5：最终定格 (18s+) ===
+                this.time.delayedCall(18000, () => {
+                    this.showFinalFrame();
+                });
+            }
+
+            startPhotoMontage() {
+                this.montageImages = [];
+                const count = 8;
+                const cx = GAME_WIDTH / 2;
+                const cy = GAME_HEIGHT / 2;
+
+                for (let i = 0; i < count; i++) {
+                    // 散乱叠放：大范围随机偏移 + 旋转
+                    const targetX = cx + Phaser.Math.Between(-200, 200);
+                    const targetY = cy + Phaser.Math.Between(-150, 120);
+                    const angle = Phaser.Math.Between(-25, 25);
+                    const targetScale = 0.55 + Math.random() * 0.25;
+                    const startX = Phaser.Math.Between(0, GAME_WIDTH);
+                    const startY = Phaser.Math.Between(-300, -50);
+
+                    const img = this.add.image(startX, startY, `photo_${i}`)
+                        .setOrigin(0.5).setDepth(155 + i).setScale(0).setAlpha(0).setAngle(angle * 2);
+
+                    this.tweens.add({
+                        targets: img,
+                        x: targetX, y: targetY,
+                        scale: targetScale,
+                        alpha: 1,
+                        angle: angle,
+                        duration: 1500 + Math.random() * 700,
+                        delay: i * 600,
+                        ease: 'Back.easeOut'
+                    });
+                    this.montageImages.push(img);
+                }
+            }
+
+            showFinalFrame() {
+                // 停止粒子效果
+                if (this.petalEmitter) this.petalEmitter.stop();
+                if (this.dustEmitter) this.dustEmitter.stop();
+
+                // 淡出蒙太奇照片
+                if (this.montageImages) {
+                    this.montageImages.forEach(img => {
+                        this.tweens.add({ targets: img, alpha: 0, duration: 1000 });
+                    });
+                }
+
+                // 淡出音频
+                if (this.celebrationSound) {
+                    this.tweens.add({
+                        targets: this.celebrationSound,
+                        volume: 0,
+                        duration: 2000
+                    });
+                }
+
+                // 最终照片全屏（保持原始比例）
+                this.time.delayedCall(1200, () => {
+                    const finalPhoto = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'final')
+                        .setOrigin(0.5).setDepth(170).setAlpha(0);
+                    // 按比例缩放，以较大边填满屏幕
+                    const tex = this.textures.get('final');
+                    const src = tex.getSourceImage();
+                    if (src) {
+                        const s = Math.max(GAME_WIDTH / src.width, GAME_HEIGHT / src.height);
+                        finalPhoto.setDisplaySize(src.width * s, src.height * s);
+                    } else {
+                        finalPhoto.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+                    }
+                    this.tweens.add({ targets: finalPhoto, alpha: 1, duration: 1500 });
+
+                    const foreverText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.78,
+                        '💍 Forever 💍', {
+                            fontSize: '96px',
+                            fontFamily: '"Huninn", "Georgia", serif',
+                            color: '#FFD700',
+                            stroke: '#000000',
+                            strokeThickness: 8,
+                            shadow: { offsetX: 0, offsetY: 0, color: '#FF69B4', blur: 20, fill: true }
+                        }).setOrigin(0.5).setDepth(180).setAlpha(0);
+                    this.tweens.add({
+                        targets: foreverText,
+                        alpha: 1,
+                        y: GAME_HEIGHT * 0.75,
+                        duration: 2000,
+                        ease: 'Sine.easeInOut'
+                    });
+                });
+
+                // 停止背景闪烁
+                this.tweens.add({ targets: [this.bgSprite, this.bgSprite2], alpha: 1, duration: 1000 });
+            }
+        }
+
+        // ==================== 游戏启动 ====================
+        const config = {
+            type: Phaser.AUTO,
+            width: GAME_WIDTH,
+            height: GAME_HEIGHT,
+            parent: 'game-container',
+            scene: [CoverScene, ProposalScene],
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            input: {
+                gamepad: true
+            },
+            backgroundColor: '#000000'
+        };
+
+        window.addEventListener('load', () => {
+            new Phaser.Game(config);
+        });
+    </script>
+</body>
+
+</html>
